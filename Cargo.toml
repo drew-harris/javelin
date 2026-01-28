@@ -11,5 +11,5 @@ crossterm = "0.28.1"
 ratatui = "0.29.0"
 color-eyre = "0.6.3"
 pickledb = { version = "0.5.1", features = ["json"] }
-dirs = "5.0"
+dirs = "6.0"
 clap = { version = "4.5", features = ["derive"] }
