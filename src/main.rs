@@ -3,11 +3,11 @@ use color_eyre::Result;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use pickledb::{PickleDb, PickleDbDumpPolicy, SerializationMethod};
 use ratatui::{
-    DefaultTerminal, Frame,
     layout::{Constraint, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState},
+    DefaultTerminal, Frame,
 };
 use std::{env, fs, process::Command};
 
@@ -279,7 +279,8 @@ impl App {
 
             // Add undo information if available
             if !self.undo_stack.is_empty() {
-                info.push_str(&format!(" | {} undo{} available",
+                info.push_str(&format!(
+                    " | {} undo{} available",
                     self.undo_stack.len(),
                     if self.undo_stack.len() > 1 { "s" } else { "" }
                 ));
@@ -291,7 +292,8 @@ impl App {
 
             // Add undo information if available
             if !self.undo_stack.is_empty() {
-                info.push_str(&format!(" | {} undo{} available",
+                info.push_str(&format!(
+                    " | {} undo{} available",
                     self.undo_stack.len(),
                     if self.undo_stack.len() > 1 { "s" } else { "" }
                 ));
@@ -422,6 +424,7 @@ impl App {
                     self.list_state.select(Some(0));
                 }
             }
+            self.quit();
         }
     }
 
