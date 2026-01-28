@@ -146,6 +146,8 @@ pub struct App {
     files: Vec<String>,
     /// Current project key
     project_key: String,
+    /// Undo stack for deleted files (stores index and filename)
+    undo_stack: Vec<(usize, String)>,
 }
 
 impl App {
@@ -187,6 +189,7 @@ impl App {
             list_state: ListState::default(),
             files: Vec::new(),
             project_key,
+            undo_stack: Vec::new(),
         };
 
         app.load_files();
@@ -248,7 +251,7 @@ impl App {
 
         let files_list = List::new(items)
             .block(Block::default().borders(Borders::ALL).title(format!(
-                "Javelin - {} - Zed Files (Shift+J/K to reorder)",
+                "Javelin - {} - Zed Files (Shift+J/K to reorder, u to undo)",
                 project_name
             )))
             .highlight_style(
@@ -260,7 +263,7 @@ impl App {
 
         frame.render_stateful_widget(files_list, chunks[0], &mut self.list_state);
 
-        // Show current file that would be added with 'a'
+        // Show current file that would be added with 'a' and undo info
         let current_file_info = if let Ok(file) = env::var("ZED_FILE") {
             // Display the relative path if possible
             let display_path = std::path::Path::new(&file)
@@ -268,13 +271,33 @@ impl App {
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_else(|_| file.clone());
 
-            if self.files.contains(&file) {
+            let mut info = if self.files.contains(&file) {
                 format!("Current file: {} (already in list)", display_path)
             } else {
                 format!("Press 'a' to add: {}", display_path)
+            };
+
+            // Add undo information if available
+            if !self.undo_stack.is_empty() {
+                info.push_str(&format!(" | {} undo{} available",
+                    self.undo_stack.len(),
+                    if self.undo_stack.len() > 1 { "s" } else { "" }
+                ));
             }
+
+            info
         } else {
-            "No ZED_FILE environment variable set".to_string()
+            let mut info = "No ZED_FILE environment variable set".to_string();
+
+            // Add undo information if available
+            if !self.undo_stack.is_empty() {
+                info.push_str(&format!(" | {} undo{} available",
+                    self.undo_stack.len(),
+                    if self.undo_stack.len() > 1 { "s" } else { "" }
+                ));
+            }
+
+            info
         };
 
         let info_paragraph = ratatui::widgets::Paragraph::new(current_file_info)
@@ -308,6 +331,7 @@ impl App {
             (_, KeyCode::Char('k')) => self.previous(),
             (_, KeyCode::Char('a')) => self.add_current_file(),
             (_, KeyCode::Char('d')) => self.delete_selected_file(),
+            (_, KeyCode::Char('u')) => self.undo_last_delete(),
             (KeyModifiers::SHIFT, KeyCode::Char('J')) => self.move_down(),
             (KeyModifiers::SHIFT, KeyCode::Char('K')) => self.move_up(),
             (_, KeyCode::Enter) => {
@@ -405,6 +429,10 @@ impl App {
     fn delete_selected_file(&mut self) {
         if let Some(selected) = self.list_state.selected() {
             if selected < self.files.len() {
+                // Push the deleted file to undo stack
+                let deleted_file = self.files[selected].clone();
+                self.undo_stack.push((selected, deleted_file));
+
                 self.files.remove(selected);
                 self.save_files();
 
@@ -446,6 +474,24 @@ impl App {
                 self.save_files();
                 self.list_state.select(Some(selected - 1));
             }
+        }
+    }
+
+    /// Undo the last deleted file
+    fn undo_last_delete(&mut self) {
+        if let Some((index, file)) = self.undo_stack.pop() {
+            // Insert the file back at its original position or at the end if index is out of bounds
+            let insert_index = if index <= self.files.len() {
+                index
+            } else {
+                self.files.len()
+            };
+
+            self.files.insert(insert_index, file);
+            self.save_files();
+
+            // Select the restored file
+            self.list_state.select(Some(insert_index));
         }
     }
 }
